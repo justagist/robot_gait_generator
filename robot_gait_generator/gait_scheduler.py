@@ -77,9 +77,6 @@ class GaitScheduler:
         return np.array(self.get_step_completion(t) < self.duty_cycles).astype(int)
 
     def get_phase_completion_percentage(self, t: float):
-        # if self.duty_cycles == 0.0 or self.duty_cycles == 1.0:
-        #     return self.get_step_completion(t)
-        # else:
         return self.get_step_completion(t) / self.duty_cycles * self.get_contact_states(t) + (
             self.get_step_completion(t) - self.duty_cycles
         ) / (1 - self.duty_cycles) * (1 - self.get_contact_states(t))
@@ -121,23 +118,6 @@ class GaitScheduler:
             t += 0.001
             prev_vals = vals.copy()
         return np.array(out)
-
-    ## TODO: Is this method needed? If yes, find a better way to do this (_prev_contact_state is
-    ## not guaranteed to be previous contact state in time, based on how this method is called)
-    # def get_phase_guard(self, t: float | np.ndarray, foot_id: int):
-    #     curr_state = self.get_contact_states(t)[foot_id]
-    #     prev_state = self._prev_contact_states[foot_id]
-    #     if isinstance(t, Number):
-    #         if curr_state == 1 and prev_state == 0:
-    #             _phase_guard = 1
-    #         elif curr_state == 0 and prev_state == 1:
-    #             _phase_guard = -1
-    #         else:
-    #             _phase_guard = 0
-    #         self._prev_contact_states[foot_id] = curr_state
-    #         return _phase_guard
-    #     else:
-    #         return np.array([self.get_phase_guard(t=_t, foot_id=foot_id) for _t in t])
 
 
 if __name__ == "__main__":

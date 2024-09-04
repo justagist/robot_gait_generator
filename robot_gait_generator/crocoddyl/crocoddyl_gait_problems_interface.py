@@ -1,10 +1,17 @@
 """
-TODO:
-    - [ ] refactor to use foot trajectory spline
-    - [ ] refactor CoM trajectory generator
+This class provides a convenient interface for setting up generic gait generation problems in Crocoddyl. It handles
+the initialization of the robot model, foot positions, and CoM, and then leverages the create_generic_gait_models
+method to generate the actual gait model sequence. Finally, it constructs a crocoddyl.ShootingProblem that can be
+solved using Crocoddyl's optimization algorithms to find the optimal trajectory for the robot to achieve the desired
+gait.
+
+This class provides a framework for easily defining and generating complex gait patterns for robots using Crocoddyl.
+It handles the low-level details of creating action models, contact models, and cost functions, allowing users to
+focus on higher-level gait parameters, and provides a the fully defined problem that can be directly solved using
+solvers in Crocoddyl.
 """
 
-from typing import List, Literal
+from typing import List
 import numpy as np
 import pinocchio
 
@@ -18,28 +25,10 @@ import crocoddyl
 
 
 class CrocoddylGaitProblemsInterface(CrocoddylGaitModelInterface):
-
-    def __init__(
-        self,
-        pinocchio_robot_model: pinocchio.Model,
-        ee_names: List[str],
-        default_standing_configuration: np.ndarray,
-        integrator: Literal["euler", "rk4"] = "euler",
-        control: Literal["zero", "one", "rk4"] = "zero",
-        fwddyn: bool = True,
-        mu: float = 0.7,
-        use_pseudo_impulse_model: bool = False,
-    ):
-        super().__init__(
-            pinocchio_robot_model=pinocchio_robot_model,
-            ee_names=ee_names,
-            default_standing_configuration=default_standing_configuration,
-            integrator=integrator,
-            control=control,
-            fwddyn=fwddyn,
-            mu=mu,
-            use_pseudo_impulse_model=use_pseudo_impulse_model,
-        )
+    """Helper class to create generic crocoddyl gait models that can be used
+    for defining gait problems in crocoddyl.
+    This class aims to help build simple locomotion problems.
+    """
 
     def create_generic_gait_problem(
         self,

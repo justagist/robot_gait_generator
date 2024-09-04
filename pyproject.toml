@@ -51,6 +51,7 @@ test = [
   "coverage>=7.2.7,<=7.6.0",
 ]
 docs = ["sphinxcontrib-napoleon", "sphinx-rtd-theme", "sphinx-autoapi"]
+examples = ["matplotlib"]
 
 [project.urls]
 Source = "https://github.com/justagist/robot_gait_generator"
@@ -58,7 +59,7 @@ Home = "https://github.com/justagist/robot_gait_generator"
 
 # Environments
 [tool.pixi.environments]
-default = { features = ["test", "docs"], solve-group = "default" }
+default = { solve-group = "default" }
 py310 = ["py310", "test"]
 py311 = ["py311", "test"]
 py312 = ["py312", "test"]
@@ -66,6 +67,7 @@ docs = ["py312", "docs"]
 devenv = { features = [
   "devenv",
 ], solve-group = "devenv", no-default-feature = true }
+examples = { features = ["examples"], solve-group = "default" }
 
 [tool.pixi.tasks]
 format = "black ."

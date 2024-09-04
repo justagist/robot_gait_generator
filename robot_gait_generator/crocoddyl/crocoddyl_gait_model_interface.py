@@ -1,18 +1,16 @@
 """
-TODO:
-    - [ ] expose weights
-    - [ ] refactor to use foot trajectory spline
-    - [ ] refactor CoM trajectory generator
+This code provides a framework for easily defining and generating complex gait patterns for robots using Crocoddyl.
+It handles the low-level details of creating action models, contact models, and cost functions, allowing users to
+focus on higher-level gait parameters.
 """
 
 # pylint: disable = E1101, E0401, W0511
 
 from typing import List, Literal, Tuple, TypeAlias, Union
-from numbers import Number
 import numpy as np
 import pinocchio
 import crocoddyl
-from .gait_scheduler import GaitScheduler
+from ..foot_trajectory_generator import FootTrajectoryGenerator
 
 Vector3D: TypeAlias = np.ndarray
 """Numpy array representating 3D cartesian vector in format [x,y,z]"""
@@ -71,93 +69,11 @@ class CrocoddylGaitModelInterface:
         self.rmodel.defaultState = np.concatenate(
             [default_standing_configuration, np.zeros(self.rmodel.nv)]
         )
-        # Defining the friction coefficient and normal
-        self.mu = 0.7
         self._r_surf = np.eye(3)
         self._use_pseudo_impulse_model = use_pseudo_impulse_model
 
     def get_ee_id(self, ee_name: str):
         return self._ee_name_to_id[ee_name]
-
-    def create_simple_footstep_models(
-        self,
-        init_com_pos: Vector3D,
-        init_swing_feet_pos: List[Vector3D],
-        relative_feet_targets: List[Vector3D],
-        foot_lift_height: float | List[float],
-        time_step: float,
-        swing_phase_duration: float,
-        support_foot_ids: List[int],
-        swing_foot_ids: List[int],
-    ) -> Tuple[List["crocoddyl.IntegratedActionModelAbstract"], np.ndarray, List[Vector3D]]:
-        """Action models for a full footstep phase. All feet that are in stance (support feet)
-        are assumed to stay in place during the full phase.
-
-        Args:
-            init_com_pos (Vector3D): initial CoM position
-            init_swing_feet_pos (List[Vector3D]): initial positions of the swinging feet
-            relative_feet_targets (List[Vector3D]): Target position for each swinging foot to land
-            foot_lift_height (float | List[float]): Foot lift height at the apex of the swing
-            time_step (float): time step
-            swing_phase_duration (float): Duration of the foot step motion
-            support_foot_ids (List[int]): Ids of the supporting (stance) feet
-            swing_foot_ids (List[int]): Ids of the swinging feet
-
-        Returns:
-            List[crocoddyl.IntegratedActionModelAbstract], np.ndarray, List[Vector3D]: List of action models that formulates
-                the full footstep motion, new CoM position at end of the phase, new feet positions at end of phase.
-        """
-        num_knots = swing_phase_duration // time_step
-        assert len(relative_feet_targets) == len(
-            init_swing_feet_pos
-        ), "`init_swing_feet_pos` and `relative_feet_targets` should be of same length (number of feet)"
-        if isinstance(foot_lift_height, Number):
-            foot_lift_height = [foot_lift_height] * len(init_swing_feet_pos)
-        num_legs = len(support_foot_ids) + len(swing_foot_ids)
-        com_percentage = float(len(swing_foot_ids)) / num_legs
-        # Action models for the foot swing
-        foot_swing_model = []
-        for k in range(num_knots):
-            swing_foot_task: List[Tuple[int, pinocchio.SE3, Vector3D]] = []
-            for n, p in enumerate(init_swing_feet_pos):
-                # Defining a foot swing task given the step length
-                # resKnot = num_knots % 2
-                ph_knots = num_knots / 2
-                dp = relative_feet_targets[n] * (k + 1) / num_knots
-                if k < ph_knots:
-                    # foot rise in the first half of the phase
-                    dp[2] = (foot_lift_height + relative_feet_targets[n][2]) * k / ph_knots
-                elif k == ph_knots:
-                    # foot reach max lift at midpoint of phase
-                    dp[2] = foot_lift_height + relative_feet_targets[n][2]
-                else:
-                    # comes down in the second half of the phase
-                    dp[2] = (foot_lift_height + relative_feet_targets[n][2]) * (
-                        1 - float(k - ph_knots) / ph_knots
-                    )
-                swing_foot_task += [[swing_foot_ids[n], pinocchio.SE3(np.eye(3), p + dp)]]
-
-            com_task = init_com_pos + (
-                np.mean(relative_feet_targets, axis=0) * (k + 1) / num_knots * com_percentage
-            )
-            foot_swing_model += [
-                self.create_swing_foot_model(
-                    time_step,
-                    support_foot_ids,
-                    com_task=com_task,
-                    swing_foot_task=swing_foot_task,
-                )
-            ]
-
-        # Action model for the foot switch at the end of the phase
-        # adds penalty for the swing foot for moving
-        foot_switch_model = self.create_foot_switch_model(support_foot_ids, swing_foot_task)
-
-        # Updating the current foot position for next step
-        init_com_pos += np.mean(relative_feet_targets, axis=0) * com_percentage
-        for n, p in enumerate(init_swing_feet_pos):
-            p += relative_feet_targets[n]
-        return [*foot_swing_model, foot_switch_model], init_com_pos, init_swing_feet_pos
 
     def create_generic_gait_models(
         self,
@@ -170,7 +86,8 @@ class CrocoddylGaitModelInterface:
         foot_lift_height: float | List[float],
         duration: float,
         time_step: float,
-    ) -> List["crocoddyl.IntegratedActionModelAbstract"]:
+        feet_trajectory_type: Literal["linear", "spline"] = "spline",
+    ) -> List[crocoddyl.IntegratedActionModelAbstract]:
         """Create a full (generic) gait model sequence given gait parameters
         and duration of motion.
 
@@ -189,29 +106,35 @@ class CrocoddylGaitModelInterface:
             List[crocoddyl.IntegratedActionModelAbstract]: Sequence of gait models
                 that can be used to formulate the shooting problem.
         """
-        gait_scheduler = GaitScheduler(
+
+        traj_gen = FootTrajectoryGenerator(
             step_frequencies=step_frequencies,
             duty_cycles=duty_cycles,
             phase_offsets=phase_offsets,
+            foot_lift_height=foot_lift_height,
+            relative_feet_targets=relative_feet_targets,
+            foot_start_positions=init_feet_pos,
+            trajectory_type=feet_trajectory_type,
         )
-
-        feet_pos = np.array(init_feet_pos)
         relative_feet_targets = np.array(relative_feet_targets)
-        contact_event_matrix = gait_scheduler.get_contact_switch_times_matrix(
+        contact_event_matrix = traj_gen.gait_scheduler.get_contact_switch_times_matrix(
             start_t=0.0, end_t=duration
         )
+
         event_id = 0
         t = 0.0
         assert contact_event_matrix[0, 0] == t
 
         assert (
-            feet_pos.shape[0]
+            len(init_feet_pos)
             == relative_feet_targets.shape[0]
-            == len(gait_scheduler.swing_durations)
+            == len(traj_gen.gait_scheduler.swing_durations)
         )
-        dp = np.zeros(feet_pos.shape)
-        for i in range(feet_pos.shape[0]):
-            dp[i, :] = relative_feet_targets[i, :] * time_step / gait_scheduler.swing_durations[i]
+        dp = np.zeros([len(init_feet_pos), 3])
+        for i in range(len(init_feet_pos)):
+            dp[i, :] = (
+                relative_feet_targets[i, :] * time_step / traj_gen.gait_scheduler.swing_durations[i]
+            )
 
         stance_feet_col_ids = np.nonzero(contact_event_matrix[event_id, 1:])[0]
         swing_feet_col_ids = np.where(contact_event_matrix[event_id, 1:] == 0)[0]
@@ -221,12 +144,8 @@ class CrocoddylGaitModelInterface:
         com_percentage = len(swing_feet_col_ids) / len(self._ee_ids)
         com_pos = np.array(init_com_pos)
 
-        models: List["crocoddyl.IntegratedActionModelAbstract"] = []
+        models: List[crocoddyl.IntegratedActionModelAbstract] = []
 
-        # import matplotlib.pyplot as plt
-
-        # com_target = []
-        # feet_trajs = {ee_name: [] for ee_name in self._ee_name_to_id.keys()}
         while t <= duration:
             if (
                 event_id < contact_event_matrix.shape[0] - 1
@@ -243,36 +162,18 @@ class CrocoddylGaitModelInterface:
                         pseudo_impulse=self._use_pseudo_impulse_model,
                     )
                 ]
-                # print(stance_feet_col_ids)
-                # print(swing_feet_col_ids)
 
-            feet_pos[swing_feet_col_ids, :] += dp[swing_feet_col_ids, :]
-            phase_completions = gait_scheduler.get_phase_completion_percentage(t=t)
-
-            # print(dp[swing_feet_col_ids, :], com_pos, com_percentage)
             if len(swing_feet_col_ids) > 0:
                 com_pos += np.mean(dp[swing_feet_col_ids, :], axis=0) * com_percentage
             swing_foot_task: List[Tuple[int, pinocchio.SE3, Vector3D]] = []
+            foot_targets, _, _ = traj_gen.get_foot_trajectory_values_at_time(t=t)
             for col_id in swing_feet_col_ids:
-                # NOTE: TODO: should use a better foot trajectory spline instead
-                # of just linear interpolation
-                foot_target = feet_pos[col_id, :] + np.array(
-                    [
-                        0,
-                        0,
-                        (1 - (abs(0.5 - phase_completions[col_id]) / 0.5)) * foot_lift_height,
-                    ]
-                )
                 swing_foot_task += [
                     [
                         int(self._ee_ids[col_id]),
-                        pinocchio.SE3(np.eye(3), foot_target.copy()),
+                        pinocchio.SE3(np.eye(3), foot_targets[col_id, :]),
                     ]
                 ]
-                # feet_trajs[self.rmodel.frames[int(self._ee_ids[col_id])].name].append(
-                #     foot_target.copy()
-                # )
-            # com_target.append(com_pos.copy())
             models += [
                 self.create_swing_foot_model(
                     time_step=time_step,
@@ -282,16 +183,6 @@ class CrocoddylGaitModelInterface:
                 )
             ]
             t += time_step
-        # plt.figure()
-        # com_target = np.array(com_target)
-        # plt.plot(com_target[:, 0], label="x")
-        # plt.plot(com_target[:, 1], label="y")
-        # plt.plot(com_target[:, 2], label="z")
-        # # for k, v in feet_trajs.items():
-        # #     plt.plot(np.array(v)[:, 2], label=k)
-        # plt.legend()
-        # plt.show()
-        # print(models)
         return models
 
     def create_swing_foot_model(
@@ -300,7 +191,7 @@ class CrocoddylGaitModelInterface:
         support_foot_ids: List[int],
         com_task: Vector3D = None,
         swing_foot_task: List[Tuple[int, pinocchio.SE3, Vector3D]] = None,
-    ) -> "crocoddyl.IntegratedActionModelAbstract":
+    ) -> crocoddyl.IntegratedActionModelAbstract:
         """Action model for a swing foot phase.
 
         Args:
@@ -345,7 +236,7 @@ class CrocoddylGaitModelInterface:
             com_track = crocoddyl.CostModelResidual(self.state, com_residual)
             cost_model.addCost("com_track", com_track, 1e6)
         for i in support_foot_ids:
-            cone = crocoddyl.FrictionCone(self._r_surf, self.mu, 4, False)
+            cone = crocoddyl.FrictionCone(self._r_surf, self._mu, 4, False)
             cone_residual = crocoddyl.ResidualModelContactFrictionCone(
                 self.state, int(i), cone, nu, self._fwddyn
             )
@@ -428,9 +319,9 @@ class CrocoddylGaitModelInterface:
         swing_foot_task: List[Tuple[int, pinocchio.SE3, Vector3D]],
         pseudo_impulse: bool = False,
     ) -> Union[
-        "crocoddyl.IntegratedActionModelEuler",
-        "crocoddyl.IntegratedActionModelRK",
-        "crocoddyl.ActionModelImpulseFwdDynamics",
+        crocoddyl.IntegratedActionModelEuler,
+        crocoddyl.IntegratedActionModelRK,
+        crocoddyl.ActionModelImpulseFwdDynamics,
     ]:
         """Action model for a foot switch phase.
 
@@ -452,7 +343,7 @@ class CrocoddylGaitModelInterface:
         self,
         support_foot_ids: List[int],
         swing_foot_task: List[Tuple[int, pinocchio.SE3, Vector3D]],
-    ) -> Union["crocoddyl.IntegratedActionModelEuler", "crocoddyl.IntegratedActionModelRK"]:
+    ) -> Union[crocoddyl.IntegratedActionModelEuler, crocoddyl.IntegratedActionModelRK]:
         """Action model for pseudo-impulse models.
 
         A pseudo-impulse model consists of adding high-penalty cost for the contact
@@ -489,7 +380,7 @@ class CrocoddylGaitModelInterface:
         # Creating the cost model for a contact phase
         cost_model = crocoddyl.CostModelSum(self.state, nu)
         for i in support_foot_ids:
-            cone = crocoddyl.FrictionCone(self._r_surf, self.mu, 4, False)
+            cone = crocoddyl.FrictionCone(self._r_surf, self._mu, 4, False)
             cone_residual = crocoddyl.ResidualModelContactFrictionCone(
                 self.state, int(i), cone, nu, self._fwddyn
             )
@@ -570,7 +461,7 @@ class CrocoddylGaitModelInterface:
         swing_foot_task: List[Tuple[int, pinocchio.SE3, Vector3D]],
         JMinvJt_damping: float = 1e-12,
         r_coeff: float = 0.0,
-    ) -> "crocoddyl.ActionModelImpulseFwdDynamics":
+    ) -> crocoddyl.ActionModelImpulseFwdDynamics:
         """Action model for impulse models.
 
         An impulse model consists of describing the impulse dynamics against a set of

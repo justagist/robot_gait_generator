@@ -94,9 +94,15 @@ class CrocoddylGaitModelInterface:
         Args:
             init_com_pos (Vector3D): Initial position of CoM in the world.
             init_feet_pos (List[Vector3D]): Initial feet positions in the world.
-            step_frequencies (float | np.ndarray): Step frequency per foot.
+            step_frequencies (float | np.ndarray): Step frequency per foot. It refers to how many steps a leg
+                takes per second. It essentially dictates the cadence or tempo of a leg's movement during locomotion.
             duty_cycles (float | np.ndarray): Duty cycle of each foot in the gait.
+                It refers to the percentage of time a leg spends in the stance phase (in contact with the
+                ground) within a single, complete gait cycle.
             phase_offsets (np.ndarray): Phase offset for each leg in the gait cycle.
+                Determines the relative timing of each leg's step cycle within the overall gait.
+                Imagine each leg having its own independent clock controlling its swing and stance phases.
+                Phase offsets are like adjusting the starting time on these clocks.
             relative_feet_targets (List[Vector3D]): Relative foot target (stride lengths)
             foot_lift_height (float | List[float]): Foot lift height for swing phase.
             duration (float): Total duration of the motion.

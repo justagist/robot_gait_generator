@@ -47,10 +47,17 @@ class CrocoddylGaitProblemsInterface(CrocoddylGaitModelInterface):
 
         Args:
             x0 (np.ndarray): Initial state (np.concatenate(q,v))
-            step_frequencies (float | np.ndarray): Step frequency per foot.
+            step_frequencies (float | np.ndarray): Step frequency per foot. It refers to how many steps a leg
+                takes per second. It essentially dictates the cadence or tempo of a leg's movement during locomotion.
             duty_cycles (float | np.ndarray): Duty cycle of each foot in the gait.
+                It refers to the percentage of time a leg spends in the stance phase (in contact with the
+                ground) within a single, complete gait cycle.
             phase_offsets (np.ndarray): Phase offset for each leg in the gait cycle.
+                Determines the relative timing of each leg's step cycle within the overall gait.
+                Imagine each leg having its own independent clock controlling its swing and stance phases.
+                Phase offsets are like adjusting the starting time on these clocks.
             relative_feet_targets (List[Vector3D]): Relative foot target (stride lengths)
+            starting_feet_heights (List[float]): Initial height of each foot.
             foot_lift_height (float | List[float]): Foot lift height for swing phase.
             duration (float): Total duration of the motion.
             time_step (float): Time step for discretising the models.
@@ -67,7 +74,7 @@ class CrocoddylGaitProblemsInterface(CrocoddylGaitModelInterface):
             init_feet_pos[ee_idx][2] = starting_feet_heights[ee_idx]
         init_com_pos = np.mean(init_feet_pos, axis=0)
         # CoM trajectory is always initialised to be at the midpoint of the feet
-        # except height
+        # except height (which is obtained from the pincchio model)
         init_com_pos[2] = pinocchio.centerOfMass(self.rmodel, self.rdata, q0)[2].item()
 
         gait_models = self.create_generic_gait_models(

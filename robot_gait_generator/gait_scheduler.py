@@ -26,7 +26,7 @@ class GaitScheduler:
         Args:
             step_frequencies (float, optional): step_frequencies = 1/T, T is step duration. Defaults to 1.0.
             duty_cycles (float, optional): range [0, 1], duty_cycles = on_time/(on_time + off_time). Defaults to 0.5.
-            phase_offsets (float, optional): range [0, 1]. Offsets of each foot's gait cycle Defaults to 0.0.
+            phase_offsets (float, optional): range [0, 1]. Offsets of each foot's gait cycle. Defaults to 0.0.
         """
         if isinstance(step_frequencies, Number):
             step_frequencies = [step_frequencies]

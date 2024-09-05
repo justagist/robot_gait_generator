@@ -6,8 +6,8 @@ from robot_gait_generator.foot_trajectory_generator import FootTrajectoryGenerat
 if __name__ == "__main__":
 
     # Define gait parameters
-    step_frequencies = np.array([1.0, 1.0, 2.0, 1.0])  # Steps per second per leg
-    duty_cycles = np.array([0.5, 0.1, 0.5, 0.5])  # Percentage of gait cycle in stance
+    step_frequencies = np.array([1.0, 1.0, 1.0, 1.0])  # Steps per second per leg
+    duty_cycles = np.array([0.5, 0.5, 0.5, 0.5])  # Percentage of gait cycle in stance
     phase_offsets = np.array([0.15, 0.0, 0.0, 0.0])  # Phase offset of each leg
     foot_lift_height = 0.1  # Foot lift height during swing phase
     relative_feet_targets = [

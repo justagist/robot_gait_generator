@@ -6,6 +6,7 @@ to create smooth foot movements.
 
 import numpy as np
 from typing import List, Tuple, Literal
+from numbers import Number
 
 from .foot_trajectories import FootTrajectorySpline, FootTrajectoryLinear, FootTrajectory
 from .gait_scheduler import GaitScheduler
@@ -21,7 +22,7 @@ class FootTrajectoryGenerator:
         step_frequencies: float | np.ndarray,
         duty_cycles: float | np.ndarray,
         phase_offsets: np.ndarray,
-        foot_lift_height: float,
+        foot_lift_height: float | List[float],
         relative_feet_targets: np.ndarray | List[np.ndarray],
         foot_start_positions: np.ndarray | List[np.ndarray] | None = None,
         trajectory_type: Literal["linear", "spline"] = "spline",
@@ -34,7 +35,7 @@ class FootTrajectoryGenerator:
             step_frequencies (float | np.ndarray): Step frequency per foot.
             duty_cycles (float | np.ndarray): Duty cycle of each foot in the gait.
             phase_offsets (np.ndarray): Phase offset for each leg in the gait cycle.
-            foot_lift_height (float): Foot lift height for swing phase.
+            foot_lift_height (float | List[float]): Foot lift height for swing phase.
             relative_feet_targets (List[np.ndarray]): End positions of each foot after one gait cycle
                 in the world frame wrt the starting positions.
             foot_start_positions (List[np.ndarray], optional): Start positions of each foot in the
@@ -55,6 +56,9 @@ class FootTrajectoryGenerator:
             FootTrajectorySpline if trajectory_type == "spline" else FootTrajectoryLinear
         )
 
+        if isinstance(foot_lift_height, Number):
+            foot_lift_height = [foot_lift_height] * self.num_legs
+
         self._foot_trajs: List[FootTrajectory] = [
             TrajectoryGen(
                 start_point=np.array(foot_start_positions)[i, :],
@@ -62,7 +66,7 @@ class FootTrajectoryGenerator:
                 + np.array(relative_feet_targets)[i, :],
                 duty_cycle=duty_cycles[i],
                 step_frequency=step_frequencies[i],
-                foot_lift_height=foot_lift_height,
+                foot_lift_height=foot_lift_height[i],
             )
             for i in range(self.num_legs)
         ]

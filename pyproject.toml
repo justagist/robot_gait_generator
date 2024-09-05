@@ -5,7 +5,7 @@ authors = [{ name = "Saif Sidhik", email = "mail@saifsidhik.page" }]
 description = "A Python Robot Control Framework for quickly prototyping control algorithms for different robot embodiments."
 readme = "README.md"
 requires-python = ">= 3.10"
-dependencies = ["crocoddyl", "numpy>=1.26", "meshcat>=0.3.2,<0.4"]
+dependencies = ["crocoddyl", "numpy>=1.26", "meshcat>=0.3.2,<0.4", "example-robot-data>=4.1.0,<5"]
 
 [build-system]
 requires = ["setuptools"]
@@ -22,12 +22,8 @@ channels = ["conda-forge"]
 platforms = ["linux-64"]
 
 [tool.pixi.dependencies]
-python = ">=3.10"
+python = ">=3.12"
 
-[tool.pixi.feature.py310.dependencies]
-python = "3.10.*"
-[tool.pixi.feature.py311.dependencies]
-python = "3.11.*"
 [tool.pixi.feature.py312.dependencies]
 python = "3.12.*"
 
@@ -60,8 +56,6 @@ Home = "https://github.com/justagist/robot_gait_generator"
 # Environments
 [tool.pixi.environments]
 default = { solve-group = "default" }
-py310 = ["py310", "test"]
-py311 = ["py311", "test"]
 py312 = ["py312", "test"]
 docs = ["py312", "docs"]
 devenv = { features = [
@@ -109,7 +103,7 @@ line-length = 100
 [tool.ruff]
 line-length = 100 # Same as Black.
 
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 # Never enforce `E501` (line length violations).
@@ -137,5 +131,3 @@ exclude_also = [
   "pass",
   "(_):",
 ]
-
-# [project.scripts]

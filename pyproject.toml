@@ -46,7 +46,6 @@ test = [
   "ruff>=0.0.280,<=0.5.5",
   "coverage>=7.2.7,<=7.6.0",
 ]
-docs = ["sphinxcontrib-napoleon", "sphinx-rtd-theme", "sphinx-autoapi"]
 examples = ["matplotlib"]
 
 [project.urls]
@@ -57,36 +56,7 @@ Home = "https://github.com/justagist/robot_gait_generator"
 [tool.pixi.environments]
 default = { solve-group = "default" }
 py312 = ["py312", "test"]
-docs = ["py312", "docs"]
-devenv = { features = [
-  "devenv",
-], solve-group = "devenv", no-default-feature = true }
 examples = { features = ["examples"], solve-group = "default" }
-
-[tool.pixi.tasks]
-format = "black ."
-check-clean-workspace = "git diff --exit-code"
-ruff-lint = "ruff check . --fix"
-pylint = "pylint --version && echo 'running pylint...' && pylint $(git ls-files '*.py')"
-lint = { depends_on = ["ruff-lint", "pylint"] }
-style = { depends_on = ["format", "lint"] }
-commit-format = "git commit -a -m'autoformat code' || true"
-test = "pytest"
-coverage = "coverage run -m pytest && coverage xml -o coverage.xml"
-coverage-report = "coverage report -m"
-update-lock = "pixi update && git commit -a -m'update pixi.lock' || true"
-push = "git push"
-update-lock-push = { depends_on = ["update-lock", "push"] }
-fix = { depends_on = ["update-lock", "format", "ruff-lint"] }
-fix-commit-push = { depends_on = ["fix", "commit-format", "update-lock-push"] }
-ci-no-cover = { depends_on = ["style", "test"] }
-ci = { depends_on = ["format", "ruff-lint", "coverage", "coverage-report"] }
-ci-push = { depends_on = ["format", "ruff-lint", "update-lock", "ci", "push"] }
-clear-pixi = "rm -rf .pixi pixi.lock"
-setup-git-merge-driver = "git config merge.ourslock.driver true"
-update-from-template-repo = "./setup_scripts/update_from_template.sh"
-view-coverage-html = "coverage html -d .htmlcov"
-generate-docs-html = "make -C docs/ html"
 
 
 [tool.pylint]
